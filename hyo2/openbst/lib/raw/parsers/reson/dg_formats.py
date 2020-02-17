@@ -4,7 +4,6 @@ from enum import Enum
 
 
 class ResonDatagrams(Enum):
-
     REFPOINT = 1000
     SENSOROFFSETS = 1001
     SENSOROFFSETSCALIB = 1002
@@ -46,6 +45,7 @@ class ResonDatagrams(Enum):
     BEAMDATACALIBRATED = 7048
     SIDESCANCALIBRATED = 7057
     SNIPPETBSSTRENGTH = 7058
+    REMOTECONTROLSONARSETTINGS = 7503
 
 
 reson_datagram_code = {
@@ -88,7 +88,8 @@ reson_datagram_code = {
     ResonDatagrams.WATERCOLUMNCOMPRESSED: 7042,
     ResonDatagrams.BEAMDATACALIBRATED: 7048,
     ResonDatagrams.SIDESCANCALIBRATED: 7058,
-    ResonDatagrams.SNIPPETBSSTRENGTH: 7058
+    ResonDatagrams.SNIPPETBSSTRENGTH: 7058,
+    ResonDatagrams.REMOTECONTROLSONARSETTINGS: 7503
 }
 
 
@@ -269,27 +270,27 @@ class Data7000(ResonData):
         elif header_unpack[8] == 4:
             self.tx_envelope = "Rect"
         self.tx_envelope_param = header_unpack[9]
-        self.tx_pulse_mode = header_unpack[10]       # TODO: make pulse mode parser
+        self.tx_pulse_mode = header_unpack[10]  # TODO: make pulse mode parser
         _ = header_unpack[11]
         self.max_pingrate = header_unpack[12]
         self.ping_period = header_unpack[13]
         self.range_select = header_unpack[14]
         self.power_select = header_unpack[15]
         self.gain_select = header_unpack[16]
-        self.control_flag = header_unpack[17]   # TODO: make control flag parser
+        self.control_flag = header_unpack[17]  # TODO: make control flag parser
         self.tx_identifier = header_unpack[18]
         self.tx_beam_steering_vertical = header_unpack[19]
         self.tx_beam_steering_horizontal = header_unpack[20]
         self.tx_beam_width_vertical = header_unpack[21]
         self.tx_beam_width_horizontal = header_unpack[22]
         self.tx_focus = header_unpack[23]
-        self.tx_shading = header_unpack[24]    # TODO: parser for shading term
+        self.tx_shading = header_unpack[24]  # TODO: parser for shading term
         self.tx_shading_param = header_unpack[25]
-        _transmit_flags = header_unpack[26]      # Currently reson does not have support for pitch and yaw stab
+        _transmit_flags = header_unpack[26]  # Currently reson does not have support for pitch and yaw stab
         self.stabilization_pitch = False
         self.stabilization_yaw = False
         self.rx_identifier = header_unpack[27]
-        self.rx_shading = header_unpack[28]     # TODO: parser for rx shading term
+        self.rx_shading = header_unpack[28]  # TODO: parser for rx shading term
         self.rx_shading_param = header_unpack[29]
         rcv_flags = header_unpack[30]
         rcv_flags = format(rcv_flags, '32b')
@@ -352,10 +353,9 @@ class Data7004(ResonData):
         data_unpack = struct.unpack(data_fmt, data_chunk)
         self.rx_beam_number = range(0, self.num_rx_beams)
         self.rx_angle_vertical = data_unpack[0:self.num_rx_beams]
-        self.rx_angle_horizontal = data_unpack[self.num_rx_beams:2*self.num_rx_beams]
-        self.rx_beam_width_along = data_unpack[2*self.num_rx_beams:3*self.num_rx_beams]
-        self.rx_beam_width_across = data_unpack[3*self.num_rx_beams:4*self.num_rx_beams]
-
+        self.rx_angle_horizontal = data_unpack[self.num_rx_beams:2 * self.num_rx_beams]
+        self.rx_beam_width_along = data_unpack[2 * self.num_rx_beams:3 * self.num_rx_beams]
+        self.rx_beam_width_across = data_unpack[3 * self.num_rx_beams:4 * self.num_rx_beams]
 
         self.parse_check = True
         return self.parse_check
@@ -510,7 +510,7 @@ class Data7027(ResonData):
         offset = 0
         if self.num_detect_ponts > 0:
             for detect_point in range(self.num_detect_ponts):
-                data_unpack = struct.unpack(fmt_base, data_chunk[offset:offset+self.data_field_size])
+                data_unpack = struct.unpack(fmt_base, data_chunk[offset:offset + self.data_field_size])
                 self.beam.append(data_unpack[0])
                 self.detect_point.append(data_unpack[1])
                 self.rx_angle.append(data_unpack[2])
@@ -570,7 +570,7 @@ class Data7028(ResonData):
         offset = 0
         if self.num_detect_points > 0:
             for n in range(self.num_detect_points):
-                data_unpack = struct.unpack(self.descriptor_fmt, data_chunk[offset:offset+self.descriptor_size])
+                data_unpack = struct.unpack(self.descriptor_fmt, data_chunk[offset:offset + self.descriptor_size])
                 self.beam_number.append(data_unpack[0])
                 self.snippet_start_sample.append(data_unpack[1])
                 self.bottom_detect_sample.append(data_unpack[2])
@@ -585,7 +585,7 @@ class Data7028(ResonData):
                     snippet_fmt = '<%dI' % num_samples
 
                 snippet_size = struct.calcsize(snippet_fmt)
-                data = struct.unpack(snippet_fmt, data_chunk[offset:offset+snippet_size])
+                data = struct.unpack(snippet_fmt, data_chunk[offset:offset + snippet_size])
                 self.snippet_samples.append(data)
                 self.snippet_samples_len.append(num_samples)
                 offset += snippet_size
@@ -644,13 +644,153 @@ class Data7200(ResonData):
 class Data7503(ResonData):
     def __init__(self, chunk):
         super().__init__()
-        self.header = None
-        self.data = None
+        self.desc = "Remote Control Sonar Settings"
+        self.parse_check = False
+        self.header_fmt = '<QI4f2If2H5f2I5fIf3IfI7f2B6fI2H2f2dH2If2BHf2B4fH2fI'
+        self.header_size = struct.calcsize(self.header_fmt)
 
-        self.parse(chunk)
+        self.sonar_id = None
+        self.ping_number = None
+        self.frequency = None
+        self.sample_rate = None
+        self.receiver_bandwidth = None
+        self.tx_pulse_width = None
+        self.tx_pulse_identifier = None
+        self.tx_pulse_envelope_id = None
+        self.tx_pulse_envelope_param = None
+        self.tx_pulse_mode = None
+        self.max_ping_rate = None
+        self.ping_period = None
+        self.range_selection = None
+        self.power_selection = None
+        self.gain_selection = None
+        self.control_flags = None
+        self.tx_id = None
+        self.tx_beam_steering_vertical = None
+        self.tx_beam_steering_horizontal = None
+        self.tx_3db_width_vertical = None
+        self.tx_3db_width_horizontal = None
+        self.tx_beam_focal_point = None
+        self.tx_window_weighting = None
+        self.tx_window_weighting_param = None
+        self.tx_flags = None
+        self.rx_id = None
+        self.rx_window_weighting = None
+        self.rx_window_weighting_param = None
+        self.rx_flags = None
+        self.bottom_detect_min_range = None
+        self.bottom_detect_max_range = None
+        self.bottom_detect_min_depth = None
+        self.bottom_detect_max_depth = None
+        self.absorption = None
+        self.sound_velocity = None
+        self.spreading = None
+        self.automatic_filter_window = None
+        self.tx_offset_x = None
+        self.tx_offset_y = None
+        self.tx_offset_z = None
+        self.tx_tilt_x = None
+        self.tx_tilt_y = None
+        self.tx_tilt_z = None
+        self.ping_state = None
+        self.beam_spacing_mode = None
+        self.s7kCenter_mode = None
+        self.adaptive_gate_min_depth = None
+        self.adaptive_gate_max_depth = None
+        self.trigger_out_width = None
+        self.trigger_out_offset = None
+        self.series_tx_selection = None
+        self.series_tx_gain = None
+        self.vernier_filter = None
+        self.custom_beams = None
+        self.coverage_angle = None
+        self.coverage_mode = None
+        self.quality_filter_flags = None
+        self.rx_steering_horizontal = None
+        self.flex_mode_coverage = None
+        self.flex_mode_steering = None
+        self.constant_spacing = None
+        self.beam_mode_selection = None
+        self.depth_gate_tilt = None
+        self.applied_frequency = None
+
+        self.parse_check = self.parse(chunk)
 
     def parse(self, chunk):
-        pass
+        header_unpack = struct.unpack(self.header_fmt, chunk)
+
+        self.sonar_id = header_unpack[0]
+        self.ping_number = header_unpack[1]
+        self.frequency = header_unpack[2]
+        self.sample_rate = header_unpack[3]
+        self.receiver_bandwidth = header_unpack[4]
+        self.tx_pulse_width = header_unpack[5]
+        self.tx_pulse_identifier = header_unpack[6]
+        self.tx_pulse_envelope_id = header_unpack[7]
+        self.tx_pulse_envelope_param = header_unpack[8]
+        self.tx_pulse_mode = header_unpack[9]
+        _ = header_unpack[10]
+        self.max_ping_rate = header_unpack[11]
+        self.ping_period = header_unpack[12]
+        self.range_selection = header_unpack[13]
+        self.power_selection = header_unpack[14]
+        self.gain_selection = header_unpack[15]
+        self.control_flags = header_unpack[16]
+        self.tx_id = header_unpack[17]
+        self.tx_beam_steering_vertical = header_unpack[18]
+        self.tx_beam_steering_horizontal = header_unpack[19]
+        self.tx_3db_width_vertical = header_unpack[20]
+        self.tx_3db_width_horizontal = header_unpack[21]
+        self.tx_beam_focal_point = header_unpack[22]
+        self.tx_window_weighting = header_unpack[23]
+        self.tx_window_weighting_param = header_unpack[24]
+        self.tx_flags = header_unpack[25]
+        self.rx_id = header_unpack[26]
+        self.rx_window_weighting = header_unpack[27]
+        self.rx_window_weighting_param = header_unpack[28]
+        self.rx_flags = header_unpack[29]
+        self.bottom_detect_min_range = header_unpack[30]
+        self.bottom_detect_max_range = header_unpack[31]
+        self.bottom_detect_min_depth = header_unpack[32]
+        self.bottom_detect_max_depth = header_unpack[33]
+        self.absorption = header_unpack[34]
+        self.sound_velocity = header_unpack[35]
+        self.spreading = header_unpack[36]
+        _ = header_unpack[37]
+        self.automatic_filter_window = header_unpack[38]
+        self.tx_offset_x = header_unpack[39]
+        self.tx_offset_y = header_unpack[40]
+        self.tx_offset_z = header_unpack[41]
+        self.tx_tilt_x = header_unpack[42]
+        self.tx_tilt_y = header_unpack[43]
+        self.tx_tilt_z = header_unpack[44]
+        self.ping_state = header_unpack[45]
+        self.beam_spacing_mode = header_unpack[46]
+        self.s7kCenter_mode = header_unpack[47]
+        self.adaptive_gate_min_depth = header_unpack[48]
+        self.adaptive_gate_max_depth = header_unpack[49]
+        self.trigger_out_width = header_unpack[50]
+        self.trigger_out_offset = header_unpack[51]
+        self.series_tx_selection = header_unpack[52]
+        _ = header_unpack[53]
+        _ = header_unpack[54]
+        self.series_tx_gain = header_unpack[55]
+        self.vernier_filter = header_unpack[56]
+        _ = header_unpack[57]
+        self.custom_beams = header_unpack[58]
+        self.coverage_angle = header_unpack[59]
+        self.coverage_mode = header_unpack[60]
+        self.quality_filter_flags = header_unpack[61]
+        self.rx_steering_horizontal = header_unpack[62]
+        self.flex_mode_coverage = header_unpack[63]
+        self.flex_mode_steering = header_unpack[64]
+        self.constant_spacing = header_unpack[65]
+        self.beam_mode_selection = header_unpack[66]
+        self.depth_gate_tilt = header_unpack[67]
+        self.applied_frequency = header_unpack[68]
+        _ = header_unpack[69]
+
+        return True
 
 
 def parse(chunk: bytes, dg_type: ResonDatagrams) -> ResonData:
@@ -701,6 +841,9 @@ def parse(chunk: bytes, dg_type: ResonDatagrams) -> ResonData:
 
     elif dg_type is ResonDatagrams.SNIPPETBSSTRENGTH:
         datapacket = Data7058(chunk)
+
+    elif dg_type is ResonDatagrams.REMOTECONTROLSONARSETTINGS:
+        datapacket = Data7503(chunk)
 
     else:
         datapacket = None
