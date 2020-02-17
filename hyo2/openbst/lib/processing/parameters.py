@@ -2,6 +2,7 @@ import logging
 
 from hyo2.openbst.lib.processing.process_methods.dicts import ProcessMethods
 
+from hyo2.openbst.lib.processing.process_methods.geolocate import GeolocationParams
 from hyo2.openbst.lib.processing.process_methods.interpolation import InterpParameters
 from hyo2.openbst.lib.processing.process_methods.raw_decoding import RawDecodeParameters
 from hyo2.openbst.lib.processing.process_methods.static_gain_compensation import StaticGainParameters
@@ -19,6 +20,7 @@ class Parameters:
         self.source_level = SourceLevelParameters()
         self.tvg = TVGCorrectionParameters()
         self.interpolation = InterpParameters()
+        self.geolocation = GeolocationParams()
 
     # TODO: Can there be a check here to create object if not yet created
     def get_process_params(self, process_type: ProcessMethods):
@@ -32,3 +34,8 @@ class Parameters:
             return self.source_level
         elif process_type == ProcessMethods.TVG:
             return self.tvg
+        elif process_type == ProcessMethods.GEOLOCATION:
+            return self.geolocation
+        else:
+            logger.error("Unrecognized Process Type: %s" % process_type)
+            return False

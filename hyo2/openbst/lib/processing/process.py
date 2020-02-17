@@ -17,6 +17,8 @@ from hyo2.openbst.lib.processing.process_methods.raw_decoding import RawDecoding
 from hyo2.openbst.lib.processing.process_methods.static_gain_compensation import StaticGainCorrection
 from hyo2.openbst.lib.processing.process_methods.source_level import SourceLevel
 from hyo2.openbst.lib.processing.process_methods.tvg import TVG
+from hyo2.openbst.lib.processing.process_methods.geolocate import Geolocation
+
 logger = logging.getLogger(__name__)
 
 
@@ -113,6 +115,12 @@ class Process:
                                           ds_raw=ds_raw,
                                           parent=self.proc_manager.parent_process,
                                           parameters=method_parameters)
+
+        elif process_method is ProcessMethods.GEOLOCATION:
+            data_out = Geolocation.position_soundings(ds_process=ds_process,
+                                                      ds_raw=ds_raw,
+                                                      parent=self.proc_manager.parent_process,
+                                                      parameters=method_parameters)
         else:
             raise RuntimeError("We realistically cannot get to this point as there is no error handling in the above"
                                "method calls")  # TODO: Impliment error handling
