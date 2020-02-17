@@ -153,6 +153,8 @@ class Interpolation:
         lon_interp = np.interp(ping_time, position_time, longitude, left=np.nan, right=np.nan)
 
         # Attitude
+        # TODO: Reson raw bathy have an applied roll. Unsure if this is a bulk offset or just applied to the gates
+        # TODO: How should I handle patch tests offsets?.
         roll_interp = np.interp(ping_time, attitude_time, roll, left=np.nan, right=np.nan)
         pitch_interp = np.interp(ping_time, attitude_time, pitch, left=np.nan, right=np.nan)
         heave_interp = np.interp(ping_time, attitude_time, heave, left=np.nan, right=np.nan)
